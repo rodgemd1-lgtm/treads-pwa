@@ -1,8 +1,7 @@
-
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Camera, RefreshCw, X, ChevronRight, Ruler, CheckCircle, AlertTriangle } from 'lucide-react';
+import { RefreshCw, Ruler, CheckCircle, AlertTriangle, XCircle, Camera } from 'lucide-react';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { analyzeTreadCanvas } from '@/lib/tread-measure';
 import { generateUUID } from '@/lib/constants';
@@ -25,7 +24,6 @@ export function TireCapture() {
 
   const activeVehicle = vehicles.find(v => v.id === selectedVehicle);
 
-  // Initialize camera
   useEffect(() => {
     let stream: MediaStream;
     async function initCamera() {
@@ -35,9 +33,7 @@ export function TireCapture() {
         });
         setVideoStream(stream);
         if (videoRef.current) videoRef.current.srcObject = stream;
-      } catch (err) {
-        console.error('Camera access denied', err);
-      }
+      } catch {}
     }
     if (step === 'scan') initCamera();
     return () => { if (stream) stream.getTracks().forEach(t => t.stop()); };
@@ -51,8 +47,7 @@ export function TireCapture() {
     canvas.height = video.videoHeight;
     const ctx = canvas.getContext('2d')!;
     ctx.drawImage(video, 0, 0);
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
-    setCapturedImage(dataUrl);
+    setCapturedImage(canvas.toDataURL('image/jpeg', 0.92));
     if (videoStream) videoStream.getTracks().forEach(t => t.stop());
     setVideoStream(null);
     setStep('reference');
@@ -63,11 +58,9 @@ export function TireCapture() {
     setAnalyzing(true);
     setStep('analyzing');
     try {
-      // Wait for dramatic effect
       await new Promise(r => setTimeout(r, 800));
-      const analysis = await analyzeTreadCanvas(capturedImage, 24.26); // Quarter diameter in mm
+      const analysis = await analyzeTreadCanvas(capturedImage, 24.26);
       setResult(analysis);
-
       if (selectedVehicle && selectedTire) {
         const m: TreadMeasurement = {
           id: generateUUID(),
@@ -84,24 +77,31 @@ export function TireCapture() {
         setMeasurements(prev => [m, ...prev]);
       }
       setStep('result');
-    } finally {
-      setAnalyzing(false);
-    }
+    } finally { setAnalyzing(false); }
   }, [capturedImage, selectedVehicle, selectedTire]);
 
-  const reset = () => {
-    setCapturedImage(null);
-    setResult(null);
-    setStep('scan');
+  const reset = () => { setCapturedImage(null); setResult(null); setStep('scan'); };
+
+  const TireButton = ({ pos, label }: { pos: string; label: string }) => {
+    const id = activeVehicle?.tires.find(t => t.position === pos)?.id;
+    if (!id) return null;
+    return (
+      <button
+        onClick={() => setSelectedTire(id)}
+        className={`py-2.5 rounded text-sm font-semibold border transition-all ${
+          selectedTire === id ? 'bg-[#d4002a] text-white border-[#d4002a]' : 'bg-white text-[#0d0d0b] border-[#e0e0e0] hover:border-[#d4002a]'
+        }`}
+      >{label}</button>
+    );
   };
 
   return (
     <div className="space-y-4 pb-24">
-      {/* Vehicle selector */}
-      <div className="card-white mx-4">
-        <label className="text-xs font-semibold text-avis-gray uppercase tracking-wider">Vehicle</label>
+      {/* Vehicle & Tire selector */}
+      <div className="card-white mx-4 space-y-3">
+        <label className="text-[10px] font-semibold text-[#767676] uppercase tracking-[0.15em]">Vehicle</label>
         <select
-          className="mt-2 w-full rounded border border-avis-border px-3 py-2.5 text-sm outline-none focus:border-avis-red bg-white"
+          className="w-full rounded-lg border border-[#e0e0e0] px-3 py-2.5 text-sm outline-none focus:border-[#d4002a] bg-white"
           value={selectedVehicle}
           onChange={e => { setSelectedVehicle(e.target.value); setSelectedTire(''); }}
         >
@@ -111,122 +111,93 @@ export function TireCapture() {
 
         {activeVehicle && (
           <>
-            <label className="mt-3 block text-xs font-semibold text-avis-gray uppercase tracking-wider">Tire Position</label>
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              {activeVehicle.tires.map(t => (
-                <button
-                  key={t.id}
-                  onClick={() => setSelectedTire(t.id)}
-                  className={`py-2.5 rounded text-sm font-semibold transition-all border ${
-                    selectedTire === t.id
-                      ? 'bg-avis-red text-white border-avis-red'
-                      : 'bg-white text-avis-dark border-avis-border'
-                  }`}
-                >
-                  {t.label}
-                </button>
-              ))}
+            <label className="text-[10px] font-semibold text-[#767676] uppercase tracking-[0.15em]">Tire Position</label>
+            <div className="grid grid-cols-4 gap-2">
+              <TireButton pos="FL" label="FL" />
+              <TireButton pos="FR" label="FR" />
+              <TireButton pos="RL" label="RL" />
+              <TireButton pos="RR" label="RR" />
             </div>
           </>
         )}
       </div>
 
-      {/* Camera / Preview */}
-      <div className="mx-4">
-        {step === 'scan' && (
-          <div className="relative rounded-xl overflow-hidden bg-avis-dark aspect-[4/5]">
-            <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
-            {/* SVG Overlay Guide */}
-            <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 400 500">
-              {/* Corner guides */}
-              <path d="M20 80 L20 20 L80 20" stroke="white" strokeWidth="3" fill="none" opacity="0.9"/>
-              <path d="M320 20 L380 20 L380 80" stroke="white" strokeWidth="3" fill="none" opacity="0.9"/>
-              <path d="M20 420 L20 480 L80 480" stroke="white" strokeWidth="3" fill="none" opacity="0.9"/>
-              <path d="M380 480 L320 480 L320 420" stroke="white" strokeWidth="3" fill="none" opacity="0.9"/>
-              {/* Center circle for coin */}
-              <circle cx="200" cy="200" r="40" stroke="white" strokeWidth="2" fill="none" strokeDasharray="8 4" opacity="0.8"/>
-              {/* Scan line */}
-              <rect x="0" y="0" width="400" height="2" fill="#d4002a" className="animate-scan-line" opacity="0.8"/>
-              {/* Labels */}
-              <text x="200" y="280" textAnchor="middle" fill="white" fontSize="12" fontFamily="sans-serif" opacity="0.9" letterSpacing="1">ALIGN COIN IN CENTER</text>
-              <text x="200" y="300" textAnchor="middle" fill="white" fontSize="10" fontFamily="sans-serif" opacity="0.7">Press shutter to capture</text>
-              {/* Side arrows indicating tire groove */}
-              <path d="M120 200 L100 190 M120 200 L100 210" stroke="white" strokeWidth="2" fill="none" opacity="0.7"/>
-              <path d="M280 200 L300 190 M280 200 L300 210" stroke="white" strokeWidth="2" fill="none" opacity="0.7"/>
-            </svg>
-            <button
-              onClick={capturePhoto}
-              className="absolute bottom-6 left-1/2 -translate-x-1/2 w-16 h-16 rounded-full border-4 border-white bg-white shadow-lg flex items-center justify-center"
-            >
-              <div className="w-12 h-12 rounded-full bg-avis-red animate-pulse" />
-            </button>
-          </div>
-        )}
+      {/* Camera View */}
+      {step === 'scan' && (
+        <div className="mx-4 relative rounded-xl overflow-hidden bg-[#0d0d0b] aspect-[3/4]">
+          <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+          <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 300 400">
+            <path d="M20 80 L20 20 L80 20" stroke="white" strokeWidth="2.5" fill="none" opacity="0.9"/>
+            <path d="M220 20 L280 20 L280 80" stroke="white" strokeWidth="2.5" fill="none" opacity="0.9"/>
+            <path d="M20 320 L20 380 L80 380" stroke="white" strokeWidth="2.5" fill="none" opacity="0.9"/>
+            <path d="M280 380 L220 380 L220 320" stroke="white" strokeWidth="2.5" fill="none" opacity="0.9"/>
+            <circle cx="150" cy="160" r="35" stroke="#d4002a" strokeWidth="2" fill="none" strokeDasharray="6 3" opacity="0.9"/>
+            <text x="150" y="210" textAnchor="middle" fill="white" fontSize="11" fontFamily="Inter, sans-serif" letterSpacing="1.5" opacity="0.95">PLACE QUARTER</text>
+            <text x="150" y="228" textAnchor="middle" fill="white" fontSize="10" fontFamily="Inter, sans-serif" opacity="0.7">IN TREAD GROOVE</text>
+            <rect x="0" y="0" width="300" height="2" fill="#d4002a" className="animate-scan-line" opacity="0.7"/>
+          </svg>
+          <button onClick={capturePhoto} className="absolute bottom-5 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-[#d4002a] text-white px-6 py-3 rounded-full font-semibold shadow-lg active:scale-95 transition-transform">
+            <Camera size={18} />
+            <span>Capture</span>
+          </button>
+        </div>
+      )}
 
-        {(step === 'reference' || step === 'analyzing') && capturedImage && (
-          <div className="relative rounded-xl overflow-hidden">
-            <img src={capturedImage} alt="Captured tire" className="w-full" />
-            {step === 'reference' && (
-              <div className="absolute inset-0 flex items-end pb-8 justify-center bg-black/20">
-                <div className="space-y-2 text-center">
-                  <p className="text-white text-sm font-medium drop-shadow-lg">Place quarter visible in tread groove</p>
-                  <button onClick={runAnalysis} className="btn-avis px-8">
-                    <div className="flex items-center gap-2">
-                      <Ruler size={18} />
-                      <span>Analyze Tread</span>
-                    </div>
-                  </button>
-                </div>
-              </div>
-            )}
-            {step === 'analyzing' && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/60">
-                <div className="text-center space-y-3">
-                  <div className="w-12 h-12 rounded-full border-4 border-white border-t-avis-red animate-spin mx-auto" />
-                  <p className="text-white font-semibold">Analyzing...</p>
-                  <p className="text-white/70 text-sm">Processing depth measurements</p>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Results */}
-        {step === 'result' && result && (
-          <div className="space-y-4">
-            <HealthGauge depthMm={result.depthMm} wearPercentage={result.wearPercentage} status={result.status} />
-            <WearHeatmap analysis={result} />
-
-            <div className="card-white space-y-4">
-              <h3 className="font-bold text-lg">Measurement Results</h3>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-avis-surface/30 rounded-lg p-3">
-                  <p className="text-xs text-avis-gray uppercase tracking-wider">Tread Depth</p>
-                  <p className="text-2xl font-bold">{result.depthMm}<span className="text-sm font-normal text-avis-gray">mm</span></p>
-                </div>
-                <div className="bg-avis-surface/30 rounded-lg p-3">
-                  <p className="text-xs text-avis-gray uppercase tracking-wider">Inches</p>
-                  <p className="text-2xl font-bold">{result.depthInches}"</p>
-                </div>
-                <div className="bg-avis-surface/30 rounded-lg p-3">
-                  <p className="text-xs text-avis-gray uppercase tracking-wider">Wear Level</p>
-                  <p className={`text-2xl font-bold ${result.status === 'replace' ? 'text-avis-red' : result.status === 'caution' ? 'text-amber-600' : 'text-green-700'}`}>{result.wearPercentage}%</p>
-                </div>
-                <div className="bg-avis-surface/30 rounded-lg p-3">
-                  <p className="text-xs text-avis-gray uppercase tracking-wider">Confidence</p>
-                  <p className="text-2xl font-bold">{Math.round(result.confidence * 100)}%</p>
-                </div>
-              </div>
-
-              <button onClick={reset} className="btn-avis w-full py-3">Scan Another Tire</button>
+      {(step === 'reference' || step === 'analyzing') && capturedImage && (
+        <div className="mx-4 relative rounded-xl overflow-hidden">
+          <img src={capturedImage} alt="Tire photo" className="w-full rounded-xl" />
+          {step === 'reference' && (
+            <div className="absolute inset-0 flex items-end justify-center pb-6 bg-gradient-to-t from-black/60 via-transparent to-transparent">
+              <button onClick={runAnalysis} className="btn-avis px-8 py-3 flex items-center gap-2">
+                <Ruler size={18} />
+                <span>Analyze Tread</span>
+              </button>
             </div>
+          )}
+          {step === 'analyzing' && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+              <div className="text-center space-y-3">
+                <div className="w-12 h-12 rounded-full border-4 border-white border-t-[#d4002a] animate-spin mx-auto" />
+                <p className="text-white font-semibold">Analyzing...</p>
+                <p className="text-white/70 text-sm">Processing depth measurements</p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {step === 'result' && result && (
+        <div className="space-y-4">
+          <HealthGauge depthMm={result.depthMm} wearPercentage={result.wearPercentage} status={result.status} />
+          <WearHeatmap analysis={result} />
+          <div className="card-white mx-4 space-y-4">
+            <h3 className="font-bold text-lg">Measurement Results</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-[#f4f4f4] rounded-lg p-3">
+                <p className="text-[10px] text-[#767676] uppercase tracking-[0.1em]">Tread Depth</p>
+                <p className="text-2xl font-bold">{result.depthMm}<span className="text-sm font-normal text-[#767676]">mm</span></p>
+              </div>
+              <div className="bg-[#f4f4f4] rounded-lg p-3">
+                <p className="text-[10px] text-[#767676] uppercase tracking-[0.1em]">Inches</p>
+                <p className="text-2xl font-bold">{result.depthInches}"</p>
+              </div>
+              <div className="bg-[#f4f4f4] rounded-lg p-3">
+                <p className="text-[10px] text-[#767676] uppercase tracking-[0.1em]">Wear Level</p>
+                <p className="text-2xl font-bold" style={{ color: result.status === 'replace' ? '#d4002a' : result.status === 'caution' ? '#b47d00' : '#1a7a3a' }}>{result.wearPercentage}%</p>
+              </div>
+              <div className="bg-[#f4f4f4] rounded-lg p-3">
+                <p className="text-[10px] text-[#767676] uppercase tracking-[0.1em]">Confidence</p>
+                <p className="text-2xl font-bold">{Math.round(result.confidence * 100)}%</p>
+              </div>
+            </div>
+            <button onClick={reset} className="btn-avis w-full py-3">Scan Another Tire</button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {!vehicles.length && step === 'scan' && (
-        <div className="card-white mx-4 text-center py-8 space-y-3">
-          <p className="text-avis-gray text-sm">Add vehicles in Fleet to start tracking</p>
+        <div className="card-white mx-4 text-center py-6">
+          <p className="text-sm text-[#767676]">Add vehicles in the Vehicles tab to start tracking</p>
         </div>
       )}
 

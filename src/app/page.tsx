@@ -12,7 +12,7 @@ export default function Home() {
   const [tab, setTab] = useState<'capture' | 'history' | 'dashboard' | 'vehicles' | 'costs'>('capture');
 
   return (
-    <main className="min-h-screen bg-[#f4f4f4] pt-4 pb-20">
+    <main className="min-h-screen bg-[#f4f4f4] pt-2 pb-20">
       <div className="max-w-lg mx-auto">
         {tab === 'capture' && <TireCapture />}
         {tab === 'history' && <MeasurementHistory />}
