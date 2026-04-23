@@ -1,12 +1,11 @@
 import { SEED_VEHICLES, SEED_MEASUREMENTS } from './constants';
 
 interface TirePosition { id: string; position: string; label: string; }
-interface Vehicle { id: string; name: string; licensePlate?: string; make?: string; model?: string; year?: number; tires: TirePosition[]; createdAt?: string; }
+interface Vehicle { id: string; name: string; licensePlate?: string; vin?: string; make?: string; model?: string; year?: number; mileage?: number; tires: TirePosition[]; createdAt?: string; }
 interface TreadMeasurement { id: string; vehicleId: string; tirePositionId: string; depthMm: number; depthInches: number; wearPercentage: number; status: string; referenceObject: string; timestamp?: string; }
 
 const SUPABASE_ENABLED = process.env.NEXT_PUBLIC_SUPABASE_ENABLED === 'true';
 
-// Lazy-load Supabase only when enabled to avoid ~48KB bundle bloat
 let supabasePromise: Promise<any> | null = null;
 function getSupabase() {
   if (!SUPABASE_ENABLED) return null;
@@ -15,18 +14,29 @@ function getSupabase() {
       const url = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
       const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
       if (!url || !key || key.startsWith('placeholder')) return null;
-      try { return createClient(url, key); } catch { return null; }
-    }).catch(() => null);
+      try { return createClient(url, key); } catch (e) { console.error('Supabase init error:', e); return null; }
+    }).catch(e => { console.error('Supabase import error:', e); return null; });
   }
   return supabasePromise;
 }
 
-// Ensure seed data exists in localStorage
+function safeParse<T>(key: string): T[] {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) { console.error(`localStorage parse error for "${key}":`, e); return []; }
+}
+
 function ensureSeedData() {
   if (typeof window === 'undefined') return;
-  const hasV = localStorage.getItem('treads_vehicles');
-  if (!hasV || JSON.parse(hasV).length === 0) {
+  const vehicles = safeParse<Vehicle>('treads_vehicles');
+  if (vehicles.length === 0) {
     localStorage.setItem('treads_vehicles', JSON.stringify(SEED_VEHICLES));
+  }
+  const measurements = safeParse<TreadMeasurement>('treads_measurements');
+  if (measurements.length === 0) {
     localStorage.setItem('treads_measurements', JSON.stringify(SEED_MEASUREMENTS));
   }
 }
@@ -40,9 +50,9 @@ export async function getVehicles(): Promise<Vehicle[]> {
     try {
       const { data, error } = await db.from('vehicles').select('*, tires:tire_positions(*)');
       if (!error && data && data.length > 0) return data as Vehicle[];
-    } catch {}
+    } catch (e) { console.error('Supabase getVehicles error:', e); }
   }
-  return JSON.parse(localStorage.getItem('treads_vehicles') || '[]');
+  return safeParse<Vehicle>('treads_vehicles');
 }
 
 export async function getMeasurements(): Promise<TreadMeasurement[]> {
@@ -52,9 +62,9 @@ export async function getMeasurements(): Promise<TreadMeasurement[]> {
     try {
       const { data, error } = await db.from('measurements').select('*').order('created_at', { ascending: false });
       if (!error && data && data.length > 0) return data as TreadMeasurement[];
-    } catch {}
+    } catch (e) { console.error('Supabase getMeasurements error:', e); }
   }
-  return JSON.parse(localStorage.getItem('treads_measurements') || '[]');
+  return safeParse<TreadMeasurement>('treads_measurements');
 }
 
 export async function addVehicle(vehicle: Omit<Vehicle, 'id' | 'createdAt'>): Promise<Vehicle> {
@@ -62,8 +72,8 @@ export async function addVehicle(vehicle: Omit<Vehicle, 'id' | 'createdAt'>): Pr
   if (db) {
     try {
       const { data, error } = await db.from('vehicles').insert({
-        name: vehicle.name, license_plate: vehicle.licensePlate,
-        make: vehicle.make, model: vehicle.model, year: vehicle.year,
+        name: vehicle.name, license_plate: vehicle.licensePlate, vin: vehicle.vin,
+        make: vehicle.make, model: vehicle.model, year: vehicle.year, mileage: vehicle.mileage,
       }).select().single();
       if (!error && data) {
         const positions = ['FL', 'FR', 'RL', 'RR'] as const;
@@ -75,12 +85,12 @@ export async function addVehicle(vehicle: Omit<Vehicle, 'id' | 'createdAt'>): Pr
         localStorage.setItem('treads_vehicles', JSON.stringify(allVehicles));
         return data as Vehicle;
       }
-    } catch {}
+    } catch (e) { console.error('Supabase addVehicle error:', e); }
   }
   const id = crypto.randomUUID?.() || `${Date.now()}`;
   const newVehicle: Vehicle = {
-    id, name: vehicle.name, licensePlate: vehicle.licensePlate,
-    make: vehicle.make, model: vehicle.model, year: vehicle.year,
+    id, name: vehicle.name, licensePlate: vehicle.licensePlate, vin: vehicle.vin,
+    make: vehicle.make, model: vehicle.model, year: vehicle.year, mileage: vehicle.mileage,
     tires: [
       { id: `${id}-FL`, position: 'FL', label: 'Front Left' },
       { id: `${id}-FR`, position: 'FR', label: 'Front Right' },
@@ -89,7 +99,7 @@ export async function addVehicle(vehicle: Omit<Vehicle, 'id' | 'createdAt'>): Pr
     ],
     createdAt: new Date().toISOString(),
   };
-  const existing = JSON.parse(localStorage.getItem('treads_vehicles') || '[]');
+  const existing = safeParse<Vehicle>('treads_vehicles');
   localStorage.setItem('treads_vehicles', JSON.stringify([newVehicle, ...existing]));
   return newVehicle;
 }
@@ -112,25 +122,43 @@ export async function addMeasurement(measurement: Omit<TreadMeasurement, 'id'>):
         }
         return data as TreadMeasurement;
       }
-    } catch {}
+    } catch (e) { console.error('Supabase addMeasurement error:', e); }
   }
   const newMeasurement: TreadMeasurement = { ...measurement, id: crypto.randomUUID?.() || `${Date.now()}` };
-  const existing = JSON.parse(localStorage.getItem('treads_measurements') || '[]');
+  const existing = safeParse<TreadMeasurement>('treads_measurements');
   localStorage.setItem('treads_measurements', JSON.stringify([newMeasurement, ...existing]));
   return newMeasurement;
 }
 
 export async function deleteVehicle(id: string): Promise<void> {
   const db = await getSupabase();
-  if (db) { try { await db.from('vehicles').delete().eq('id', id); } catch {} }
-  const existing = JSON.parse(localStorage.getItem('treads_vehicles') || '[]');
-  localStorage.setItem('treads_vehicles', JSON.stringify(existing.filter((v: Vehicle) => v.id !== id)));
+  if (db) { try { await db.from('vehicles').delete().eq('id', id); } catch (e) { console.error('Supabase deleteVehicle error:', e); } }
+  const existing = safeParse<Vehicle>('treads_vehicles');
+  localStorage.setItem('treads_vehicles', JSON.stringify(existing.filter(v => v.id !== id)));
 }
 
-export async function uploadImage(file: File): Promise<string> {
-  const reader = new FileReader();
-  return new Promise<string>((resolve) => {
-    reader.onload = () => resolve(reader.result as string);
-    reader.readAsDataURL(file);
-  });
+export function exportData(): { vehicles: Vehicle[]; measurements: TreadMeasurement[]; exportedAt: string; app: string } {
+  return {
+    vehicles: safeParse<Vehicle>('treads_vehicles'),
+    measurements: safeParse<TreadMeasurement>('treads_measurements'),
+    exportedAt: new Date().toISOString(),
+    app: 'AVIS Tread Intel v2.0',
+  };
+}
+
+export function exportCSV(): string {
+  const vehicles = safeParse<Vehicle>('treads_vehicles');
+  const measurements = safeParse<TreadMeasurement>('treads_measurements');
+  const headers = ['Vehicle', 'License Plate', 'Make', 'Model', 'Year', 'Mileage', 'Tire Position', 'Depth (mm)', 'Depth (in)', 'Wear %', 'Status', 'Date'];
+  const rows = [];
+  for (const v of vehicles) {
+    const vMeasurements = measurements.filter(m => m.vehicleId === v.id);
+    if (vMeasurements.length === 0) {
+      rows.push([v.name, v.licensePlate || '', v.make || '', v.model || '', v.year || '', v.mileage || '', 'All', 'N/A', 'N/A', 'N/A', 'No data', ''].map(s => `"${s}"`).join(','));
+    }
+    for (const m of vMeasurements) {
+      rows.push([v.name, v.licensePlate || '', v.make || '', v.model || '', v.year || '', v.mileage || '', m.tirePositionId, m.depthMm, m.depthInches, m.wearPercentage, m.status, m.timestamp || ''].map(s => `"${s}"`).join(','));
+    }
+  }
+  return [headers.join(','), ...rows].join('\n');
 }

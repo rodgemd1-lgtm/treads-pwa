@@ -12,9 +12,13 @@ export interface AnalysisResult {
   blocks: number;
 }
 
+// Named constants for calibration
+const MAX_NEW_TREAD_MM = 11;
+
 /**
- * Detect a circular reference object (quarter: 24.26mm) using edge detection
- * and Hough-circle approximation.
+ * Detect a circular reference object using Sobel edge detection
+ * and centroid-based circle reconstruction.
+ * Supports: US Quarter (24.26mm), US Penny (19.05mm), or manual gauge (0mm)
  */
 function detectCoin(data: ImageData): { cx: number; cy: number; radius: number; found: boolean } {
   const W = data.width, H = data.height;
@@ -32,20 +36,40 @@ function detectCoin(data: ImageData): { cx: number; cy: number; radius: number; 
     }
   }
 
-  // Threshold for strong edges
+  // Adaptive threshold: use mean + 1.5 stdev for edge detection
+  const edgeMean = edgeMag.reduce((s, v) => s + v, 0) / edgeMag.length;
+  const edgeStd = Math.sqrt(edgeMag.reduce((s, v) => s + (v - edgeMean) ** 2, 0) / edgeMag.length);
+  const edgeThreshold = Math.max(40, edgeMean + 1.5 * edgeStd);
+
   const edges: [number, number][] = [];
   for (let i = 0; i < W * H; i++) {
-    if (edgeMag[i] > 60) {
+    if (edgeMag[i] > edgeThreshold) {
       edges.push([i % W, Math.floor(i / W)]);
     }
   }
 
-  // Simple circle detection: find centroid of edge cluster & average radius
   if (edges.length < 20) return { cx: W / 2, cy: H / 2, radius: Math.max(W, H) * 0.15, found: false };
 
-  const cx = edges.reduce((s, p) => s + p[0], 0) / edges.length;
-  const cy = edges.reduce((s, p) => s + p[1], 0) / edges.length;
-  const radius = edges.reduce((s, p) => s + Math.sqrt((p[0] - cx) ** 2 + (p[1] - cy) ** 2), 0) / edges.length;
+  // Weighted centroid (edge magnitude as weight)
+  let cx = 0, cy = 0, totalWeight = 0;
+  for (const [ex, ey] of edges) {
+    const w = edgeMag[ey * W + ex];
+    cx += ex * w;
+    cy += ey * w;
+    totalWeight += w;
+  }
+  cx /= totalWeight;
+  cy /= totalWeight;
+
+  // Compute weighted average radius
+  let radiusSum = 0, radiusWeight = 0;
+  for (const [ex, ey] of edges) {
+    const d = Math.sqrt((ex - cx) ** 2 + (ey - cy) ** 2);
+    const w = edgeMag[ey * W + ex];
+    radiusSum += d * w;
+    radiusWeight += w;
+  }
+  const radius = radiusWeight > 0 ? radiusSum / radiusWeight : Math.max(W, H) * 0.15;
 
   return { cx, cy, radius, found: edges.length >= 30 };
 }
@@ -144,8 +168,7 @@ export async function analyzeTreadCanvas(
         const depthMm = avgDepthPx / pxPerMm;
         const depthInches = depthMm / 25.4;
         const status = getTreadStatus(depthMm);
-        const maxDepth = 11;
-        const wearPercentage = Math.max(0, Math.min(100, ((maxDepth - depthMm) / maxDepth) * 100));
+        const wearPercentage = Math.max(0, Math.min(100, ((MAX_NEW_TREAD_MM - depthMm) / MAX_NEW_TREAD_MM) * 100));
 
         // 4. Draw annotations on canvas
         // Draw detected coin circle

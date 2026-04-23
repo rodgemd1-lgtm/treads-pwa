@@ -1,13 +1,23 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { RefreshCw, Ruler, CheckCircle, AlertTriangle, XCircle, Camera } from 'lucide-react';
+import { Camera } from 'lucide-react';
 import { useLocalStorage } from '@/hooks/use-local-storage';
-import { analyzeTreadCanvas } from '@/lib/tread-measure';
+import { analyzeTreadCanvas, type AnalysisResult } from '@/lib/tread-measure';
 import { generateUUID } from '@/lib/constants';
 import type { Vehicle, TreadMeasurement } from '@/types';
 import { HealthGauge } from './HealthGauge';
 import { WearHeatmap } from './WearHeatmap';
+
+const TireButton = ({ pos, label, selected, onSelect }: { pos: string; label: string; selected: boolean; onSelect: () => void }) => (
+  <button
+    aria-label={`Select ${label} tire`}
+    onClick={onSelect}
+    className={`py-2.5 rounded text-sm font-semibold border transition-all ${
+      selected ? 'bg-[#d4002a] text-white border-[#d4002a]' : 'bg-white text-[#0d0d0b] border-[#e0e0e0] hover:border-[#d4002a]'
+    }`}
+  >{label}</button>
+);
 
 export function TireCapture() {
   const [vehicles] = useLocalStorage<Vehicle[]>('treads_vehicles', []);
@@ -17,26 +27,37 @@ export function TireCapture() {
   const [selectedVehicle, setSelectedVehicle] = useState('');
   const [selectedTire, setSelectedTire] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
-  const [result, setResult] = useState<any>(null);
-  const [step, setStep] = useState<'scan' | 'reference' | 'analyzing' | 'result'>('scan');
+  const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [step, setStep] = useState<'scan' | 'reference' | 'analyzing' | 'result' | 'error'>('scan');
+  const [errorMsg, setErrorMsg] = useState('');
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const activeVehicle = vehicles.find(v => v.id === selectedVehicle);
 
+  // Camera lifecycle with proper cleanup
   useEffect(() => {
-    let stream: MediaStream;
+    let stream: MediaStream | null = null;
+    let mounted = true;
+
     async function initCamera() {
       try {
         stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
         });
+        if (!mounted) { stream.getTracks().forEach(t => t.stop()); return; }
         setVideoStream(stream);
         if (videoRef.current) videoRef.current.srcObject = stream;
-      } catch {}
+      } catch (err) {
+        console.error('Camera init failed:', err);
+      }
     }
+
     if (step === 'scan') initCamera();
-    return () => { if (stream) stream.getTracks().forEach(t => t.stop()); };
+    return () => {
+      mounted = false;
+      if (stream) stream.getTracks().forEach(t => t.stop());
+    };
   }, [step]);
 
   const capturePhoto = useCallback(() => {
@@ -69,41 +90,35 @@ export function TireCapture() {
           depthMm: analysis.depthMm,
           depthInches: analysis.depthInches,
           timestamp: new Date().toISOString(),
-          imageUrl: analysis.annotatedImage,
-          referenceObject: 'quarter' as const,
+          referenceObject: 'quarter',
           wearPercentage: analysis.wearPercentage,
           status: analysis.status,
         };
         setMeasurements(prev => [m, ...prev]);
       }
       setStep('result');
-    } finally { setAnalyzing(false); }
-  }, [capturedImage, selectedVehicle, selectedTire]);
+    } catch (err) {
+      console.error('Analysis failed:', err);
+      setErrorMsg('Analysis failed. Please try again.');
+      setStep('error');
+    } finally {
+      setAnalyzing(false);
+    }
+  }, [capturedImage, selectedVehicle, selectedTire, setMeasurements]);
 
-  const reset = () => { setCapturedImage(null); setResult(null); setStep('scan'); };
-
-  const TireButton = ({ pos, label }: { pos: string; label: string }) => {
-    const id = activeVehicle?.tires?.find(t => t.position === pos)?.id;
-    if (!id) return null;
-    return (
-      <button
-        onClick={() => setSelectedTire(id)}
-        className={`py-2.5 rounded text-sm font-semibold border transition-all ${
-          selectedTire === id ? 'bg-[#d4002a] text-white border-[#d4002a]' : 'bg-white text-[#0d0d0b] border-[#e0e0e0] hover:border-[#d4002a]'
-        }`}
-      >{label}</button>
-    );
-  };
+  const reset = () => { setCapturedImage(null); setResult(null); setErrorMsg(''); setStep('scan'); };
 
   return (
     <div className="space-y-4 pb-24">
       {/* Vehicle & Tire selector */}
       <div className="card-white mx-4 space-y-3">
-        <label className="text-[10px] font-semibold text-[#767676] uppercase tracking-[0.15em]">Vehicle</label>
+        <label htmlFor="vehicle-select" className="text-[10px] font-semibold text-[#767676] uppercase tracking-[0.15em]">Vehicle</label>
         <select
+          id="vehicle-select"
           className="w-full rounded-lg border border-[#e0e0e0] px-3 py-2.5 text-sm outline-none focus:border-[#d4002a] bg-white"
           value={selectedVehicle}
           onChange={e => { setSelectedVehicle(e.target.value); setSelectedTire(''); }}
+          aria-label="Select vehicle"
         >
           <option value="">Select vehicle...</option>
           {vehicles.map(v => <option key={v.id} value={v.id}>{v.name} {v.licensePlate ? `- ${v.licensePlate}` : ''}</option>)}
@@ -111,12 +126,17 @@ export function TireCapture() {
 
         {activeVehicle && (
           <>
-            <label className="text-[10px] font-semibold text-[#767676] uppercase tracking-[0.15em]">Tire Position</label>
-            <div className="grid grid-cols-4 gap-2">
-              <TireButton pos="FL" label="FL" />
-              <TireButton pos="FR" label="FR" />
-              <TireButton pos="RL" label="RL" />
-              <TireButton pos="RR" label="RR" />
+            <span className="text-[10px] font-semibold text-[#767676] uppercase tracking-[0.15em]">Tire Position</span>
+            <div className="grid grid-cols-4 gap-2" role="group" aria-label="Tire position">
+              {activeVehicle.tires.map(t => (
+                <TireButton
+                  key={t.id}
+                  pos={t.position}
+                  label={t.position}
+                  selected={selectedTire === t.id}
+                  onSelect={() => setSelectedTire(t.id)}
+                />
+              ))}
             </div>
           </>
         )}
@@ -126,7 +146,7 @@ export function TireCapture() {
       {step === 'scan' && (
         <div className="mx-4 relative rounded-xl overflow-hidden bg-[#0d0d0b] aspect-[3/4]">
           <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
-          <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 300 400">
+          <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 300 400" aria-hidden="true">
             <path d="M20 80 L20 20 L80 20" stroke="white" strokeWidth="2.5" fill="none" opacity="0.9"/>
             <path d="M220 20 L280 20 L280 80" stroke="white" strokeWidth="2.5" fill="none" opacity="0.9"/>
             <path d="M20 320 L20 380 L80 380" stroke="white" strokeWidth="2.5" fill="none" opacity="0.9"/>
@@ -134,9 +154,8 @@ export function TireCapture() {
             <circle cx="150" cy="160" r="35" stroke="#d4002a" strokeWidth="2" fill="none" strokeDasharray="6 3" opacity="0.9"/>
             <text x="150" y="210" textAnchor="middle" fill="white" fontSize="11" fontFamily="Inter, sans-serif" letterSpacing="1.5" opacity="0.95">PLACE QUARTER</text>
             <text x="150" y="228" textAnchor="middle" fill="white" fontSize="10" fontFamily="Inter, sans-serif" opacity="0.7">IN TREAD GROOVE</text>
-            <rect x="0" y="0" width="300" height="2" fill="#d4002a" className="animate-scan-line" opacity="0.7"/>
           </svg>
-          <button onClick={capturePhoto} className="absolute bottom-5 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-[#d4002a] text-white px-6 py-3 rounded-full font-semibold shadow-lg active:scale-95 transition-transform">
+          <button onClick={capturePhoto} className="absolute bottom-5 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-[#d4002a] text-white px-6 py-3 rounded-full font-semibold shadow-lg active:scale-95 transition-transform" aria-label="Capture tire photo">
             <Camera size={18} />
             <span>Capture</span>
           </button>
@@ -145,17 +164,17 @@ export function TireCapture() {
 
       {(step === 'reference' || step === 'analyzing') && capturedImage && (
         <div className="mx-4 relative rounded-xl overflow-hidden">
-          <img src={capturedImage} alt="Tire photo" className="w-full rounded-xl" />
+          <img src={capturedImage} alt="Captured tire photo" className="w-full rounded-xl" />
           {step === 'reference' && (
             <div className="absolute inset-0 flex items-end justify-center pb-6 bg-gradient-to-t from-black/60 via-transparent to-transparent">
               <button onClick={runAnalysis} className="btn-avis px-8 py-3 flex items-center gap-2">
-                <Ruler size={18} />
+                <span style={{ fontSize: '18px' }}>📏</span>
                 <span>Analyze Tread</span>
               </button>
             </div>
           )}
           {step === 'analyzing' && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+            <div className="absolute inset-0 flex items-center justify-center bg-black/60" role="status" aria-label="Analyzing tread depth">
               <div className="text-center space-y-3">
                 <div className="w-12 h-12 rounded-full border-4 border-white border-t-[#d4002a] animate-spin mx-auto" />
                 <p className="text-white font-semibold">Analyzing...</p>
@@ -163,6 +182,13 @@ export function TireCapture() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {step === 'error' && (
+        <div className="card-white mx-4 text-center py-6 space-y-3">
+          <p className="text-[#d4002a] font-semibold">{errorMsg}</p>
+          <button onClick={reset} className="btn-avis px-6 py-2">Try Again</button>
         </div>
       )}
 
@@ -196,12 +222,12 @@ export function TireCapture() {
       )}
 
       {!vehicles.length && step === 'scan' && (
-        <div className="card-white mx-4 text-center py-6">
+        <div className="card-white mx-4 text-center py-6" role="status">
           <p className="text-sm text-[#767676]">Add vehicles in the Vehicles tab to start tracking</p>
         </div>
       )}
 
-      <canvas ref={canvasRef} className="hidden" />
+      <canvas ref={canvasRef} className="hidden" aria-hidden="true" />
     </div>
   );
 }

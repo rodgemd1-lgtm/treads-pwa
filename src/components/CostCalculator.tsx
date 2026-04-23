@@ -37,9 +37,9 @@ export function CostCalculator() {
         <div>
           <label className="text-[10px] font-semibold text-[#767676] uppercase tracking-[0.15em]">Number of Tires</label>
           <div className="flex items-center gap-3 mt-2">
-            <button onClick={() => setCount(Math.max(1, count - 1))} className="w-10 h-10 rounded-lg bg-[#f4f4f4] font-bold text-lg flex items-center justify-center">-</button>
+            <button onClick={() => setCount(Math.max(1, count - 1))} className="w-10 h-10 rounded-lg bg-[#f4f4f4] font-bold text-lg flex items-center justify-center" aria-label="Decrease tire count">-</button>
             <span className="text-2xl font-bold w-12 text-center">{count}</span>
-            <button onClick={() => setCount(Math.min(12, count + 1))} className="w-10 h-10 rounded-lg bg-[#f4f4f4] font-bold text-lg flex items-center justify-center">+</button>
+            <button onClick={() => setCount(Math.min(12, count + 1))} className="w-10 h-10 rounded-lg bg-[#f4f4f4] font-bold text-lg flex items-center justify-center" aria-label="Increase tire count">+</button>
           </div>
         </div>
       </div>

@@ -1,50 +1,48 @@
 'use client';
 
 import { useMemo } from 'react';
+import type { AnalysisResult } from '@/lib/tread-measure';
 
-export function WearHeatmap({ analysis }: { analysis: any }) {
+export function WearHeatmap({ analysis }: { analysis: AnalysisResult }) {
+  const MAX_NEW_TREAD_MM = 11;
+
   const blocks = useMemo(() => {
-    const count = 12;
-    const baseDepth = analysis?.depthMm || 6;
-    return Array.from({ length: count }, (_, i) => {
-      const outerFactor = i < 3 || i > 8 ? 0.85 : 1;
-      const noise = 0.9 + Math.random() * 0.2;
-      const depth = Math.max(2, (baseDepth * outerFactor * noise));
-      const wear = Math.min(100, ((10 - depth) / 10) * 100);
-      return { id: i, depth, wear };
+    return Array.from({ length: 12 }, (_, i) => {
+      const deviation = ((i * 997) % 20) / 100; // deterministic pseudo-noise
+      const noise = 0.9 + deviation;
+      const baseWear = analysis.wearPercentage / 100;
+      const localWear = Math.min(1, Math.max(0, baseWear * noise));
+      return { index: i, wear: localWear };
     });
-  }, [analysis]);
+  }, [analysis.wearPercentage]);
 
-  const getBlockColor = (wear: number) => {
-    if (wear < 30) return '#3860be';
-    if (wear < 50) return '#1a7a3a';
-    if (wear < 75) return '#b47d00';
-    return '#d4002a';
+  const color = (wear: number) => {
+    if (wear < 0.3) return '#1a7a3a';
+    if (wear < 0.55) return '#3860be';
+    if (wear < 0.65) return '#b47d00';
+    if (wear < 0.75) return '#d4002a';
+    return '#91001d';
   };
 
   return (
     <div className="card-white mx-4 space-y-3">
-      <h3 className="font-bold">Tread Profile</h3>
-      <div className="flex items-center gap-1">
-        {blocks.map(b => (
-          <div key={b.id} className="flex flex-col items-center gap-0.5">
-            <div
-              className="w-6 rounded-sm transition-all tread-block"
-              style={{
-                height: `${Math.max(12, 40 - b.wear * 0.35)}px`,
-                background: getBlockColor(b.wear),
-                opacity: 0.85,
-              }}
-            />
-            <span className="text-[8px] text-avis-gray">{Math.round(b.depth * 10) / 10}</span>
+      <h3 className="font-bold text-sm">Tread Profile</h3>
+      <div className="grid grid-cols-6 gap-1.5" role="img" aria-label={`Tread wear profile showing ${Math.round(analysis.wearPercentage)}% average wear`}>
+        {blocks.map(({ index, wear }) => (
+          <div
+            key={index}
+            className="aspect-square rounded-sm flex items-end justify-center pb-0.5"
+            style={{ background: color(wear) }}
+            aria-hidden="true"
+          >
+            <span className="text-[8px] text-white/80 font-medium">{Math.round(wear * 100)}%</span>
           </div>
         ))}
       </div>
-      <div className="grid grid-cols-2 gap-2 text-xs text-avis-gray">
-        <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm" style={{background:'#3860be'}} /><span>{'Excellent <30%'}</span></div>
-        <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm" style={{background:'#1a7a3a'}} /><span>Good 30-50%</span></div>
-        <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm" style={{background:'#b47d00'}} /><span>Caution 50-75%</span></div>
-        <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm" style={{background:'#d4002a'}} /><span>{'Replace >75%'}</span></div>
+      <div className="flex justify-between text-[9px] text-[#767676]">
+        <span>Shoulder</span>
+        <span>Center</span>
+        <span>Shoulder</span>
       </div>
     </div>
   );

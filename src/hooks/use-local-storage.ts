@@ -10,14 +10,20 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
     try {
       const item = localStorage.getItem(key);
       if (item) setStored(JSON.parse(item));
-    } catch { /* ignore */ }
+    } catch (err) {
+      console.error(`localStorage read error for key "${key}":`, err);
+    }
     setLoaded(true);
   }, [key]);
 
   const setValue = useCallback((value: T | ((prev: T) => T)) => {
     setStored((prev) => {
       const next = typeof value === 'function' ? (value as (prev: T) => T)(prev) : value;
-      localStorage.setItem(key, JSON.stringify(next));
+      try {
+        localStorage.setItem(key, JSON.stringify(next));
+      } catch (err) {
+        console.error('localStorage quota exceeded', err);
+      }
       return next;
     });
   }, [key]);
