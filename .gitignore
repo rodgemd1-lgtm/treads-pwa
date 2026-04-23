@@ -5,3 +5,4 @@ dist/
 avis-design/
 *.env
 *.env.local
+supabase/.temp/

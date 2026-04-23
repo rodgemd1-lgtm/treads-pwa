@@ -50,16 +50,19 @@ export function generateUUID() {
   return crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-// Avis fleet seed data
+// Avis fleet seed data — Denver Metro Region
+// Managed by: James Loehr (Fleet Operations)
 export const SEED_VEHICLES = [
-  { id: 'v1', name: 'Toyota Camry #1207', licensePlate: 'CO-AVS-1207', make: 'Toyota', model: 'Camry', year: 2024 },
-  { id: 'v2', name: 'Chevrolet Equinox #0893', licensePlate: 'CO-AVS-0893', make: 'Chevrolet', model: 'Equinox', year: 2025 },
-  { id: 'v3', name: 'Ford Explorer #1456', licensePlate: 'CO-AVS-1456', make: 'Ford', model: 'Explorer', year: 2024 },
-  { id: 'v4', name: 'Hyundai Venue #2034', licensePlate: 'CO-AVS-2034', make: 'Hyundai', model: 'Venue', year: 2025 },
-  { id: 'v5', name: 'Toyota Corolla #0678', licensePlate: 'CO-AVS-0678', make: 'Toyota', model: 'Corolla', year: 2024 },
-  { id: 'v6', name: 'Cadillac XT6 #3012', licensePlate: 'CO-AVS-3012', make: 'Cadillac', model: 'XT6', year: 2025 },
-  { id: 'v7', name: 'Chrysler Pacifica #0567', licensePlate: 'CO-AVS-0567', make: 'Chrysler', model: 'Pacifica', year: 2024 },
-  { id: 'v8', name: 'Tesla Model 3 #1789', licensePlate: 'CO-AVS-1789', make: 'Tesla', model: 'Model 3', year: 2025 },
+  { id: 'v1', name: 'Toyota Camry #1207', licensePlate: 'CO-AVS-1207', make: 'Toyota', model: 'Camry', year: 2024, mileage: 28450 },
+  { id: 'v2', name: 'Chevrolet Equinox #0893', licensePlate: 'CO-AVS-0893', make: 'Chevrolet', model: 'Equinox', year: 2025, mileage: 3200 },
+  { id: 'v3', name: 'Ford Explorer #1456', licensePlate: 'CO-AVS-1456', make: 'Ford', model: 'Explorer', year: 2024, mileage: 41200 },
+  { id: 'v4', name: 'Hyundai Venue #2034', licensePlate: 'CO-AVS-2034', make: 'Hyundai', model: 'Venue', year: 2025, mileage: 1850 },
+  { id: 'v5', name: 'Toyota Corolla #0678', licensePlate: 'CO-AVS-0678', make: 'Toyota', model: 'Corolla', year: 2024, mileage: 35600 },
+  { id: 'v6', name: 'Cadillac XT6 #3012', licensePlate: 'CO-AVS-3012', make: 'Cadillac', model: 'XT6', year: 2025, mileage: 8900 },
+  { id: 'v7', name: 'Chrysler Pacifica #0567', licensePlate: 'CO-AVS-0567', make: 'Chrysler', model: 'Pacifica', year: 2024, mileage: 52300 },
+  { id: 'v8', name: 'Tesla Model 3 #1789', licensePlate: 'CO-AVS-1789', make: 'Tesla', model: 'Model 3', year: 2025, mileage: 5400 },
+  // James Loehr personal vehicle
+  { id: 'v9', name: 'Honda CR-V #4401', licensePlate: 'CO-JL-2026', make: 'Honda', model: 'CR-V', year: 2023, mileage: 31200 },
 ];
 
 export const SEED_MEASUREMENTS = [
@@ -75,4 +78,9 @@ export const SEED_MEASUREMENTS = [
   { id: 'm10', vehicleId: 'v3', tirePositionId: 'v3-RR', depthMm: 3.2, depthInches: 0.13, wearPercentage: 70.9, status: 'replace' as const, referenceObject: 'quarter' as const, timestamp: '2026-04-15T14:20:00Z' },
   { id: 'm11', vehicleId: 'v6', tirePositionId: 'v6-FL', depthMm: 8.5, depthInches: 0.33, wearPercentage: 22.7, status: 'new' as const, referenceObject: 'quarter' as const, timestamp: '2026-04-08T08:30:00Z' },
   { id: 'm12', vehicleId: 'v6', tirePositionId: 'v6-FR', depthMm: 6.1, depthInches: 0.24, wearPercentage: 44.5, status: 'good' as const, referenceObject: 'quarter' as const, timestamp: '2026-04-08T08:35:00Z' },
+  // James Loehr CR-V — checked before rental return
+  { id: 'm13', vehicleId: 'v9', tirePositionId: 'v9-FL', depthMm: 5.8, depthInches: 0.23, wearPercentage: 47.3, status: 'caution' as const, referenceObject: 'quarter' as const, timestamp: '2026-04-22T09:00:00Z' },
+  { id: 'm14', vehicleId: 'v9', tirePositionId: 'v9-FR', depthMm: 6.3, depthInches: 0.25, wearPercentage: 42.7, status: 'good' as const, referenceObject: 'quarter' as const, timestamp: '2026-04-22T09:05:00Z' },
+  { id: 'm15', vehicleId: 'v9', tirePositionId: 'v9-RL', depthMm: 4.9, depthInches: 0.19, wearPercentage: 55.5, status: 'caution' as const, referenceObject: 'quarter' as const, timestamp: '2026-04-22T09:10:00Z' },
+  { id: 'm16', vehicleId: 'v9', tirePositionId: 'v9-RR', depthMm: 4.5, depthInches: 0.18, wearPercentage: 59.1, status: 'caution' as const, referenceObject: 'quarter' as const, timestamp: '2026-04-22T09:15:00Z' },
 ];

@@ -26,7 +26,7 @@ export interface Vehicle {
   model?: string;
   year?: number;
   mileage?: number;
-  tires?: TirePosition[];
+  tires: TirePosition[];
   createdAt?: string;
 }
 
