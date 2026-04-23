@@ -26,8 +26,8 @@ export interface Vehicle {
   model?: string;
   year?: number;
   mileage?: number;
-  tires: TirePosition[];
-  createdAt: string;
+  tires?: TirePosition[];
+  createdAt?: string;
 }
 
 export interface WearAlert {

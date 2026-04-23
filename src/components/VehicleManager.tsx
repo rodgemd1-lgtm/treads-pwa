@@ -96,7 +96,7 @@ export function VehicleManager() {
                 </button>
               </div>
               <div className="mt-3 grid grid-cols-4 gap-1.5">
-                {v.tires.map(t => (
+                {v.tires?.map(t => (
                   <div key={t.id} className="bg-[#f4f4f4] rounded p-1.5 text-center">
                     <span className="text-[9px] text-[#767676]">{t.position}</span>
                   </div>

@@ -83,7 +83,7 @@ export function TireCapture() {
   const reset = () => { setCapturedImage(null); setResult(null); setStep('scan'); };
 
   const TireButton = ({ pos, label }: { pos: string; label: string }) => {
-    const id = activeVehicle?.tires.find(t => t.position === pos)?.id;
+    const id = activeVehicle?.tires?.find(t => t.position === pos)?.id;
     if (!id) return null;
     return (
       <button

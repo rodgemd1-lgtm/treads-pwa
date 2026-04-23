@@ -7,9 +7,13 @@ import { MeasurementHistory } from '@/components/MeasurementHistory';
 import { VehicleManager } from '@/components/VehicleManager';
 import { WearDashboard } from '@/components/WearDashboard';
 import { CostCalculator } from '@/components/CostCalculator';
+import { useSeedData } from '@/hooks/use-seed-data';
 
 export default function Home() {
   const [tab, setTab] = useState<'capture' | 'history' | 'dashboard' | 'vehicles' | 'costs'>('capture');
+
+  // Seed demo data on first load
+  useSeedData();
 
   return (
     <main className="min-h-screen bg-[#f4f4f4] pt-2 pb-20">

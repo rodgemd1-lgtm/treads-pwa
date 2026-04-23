@@ -38,7 +38,7 @@ export function MeasurementHistory() {
         <div className="space-y-2 mx-4">
           {measurements.map(m => {
             const vehicle = vehicles.find(v => v.id === m.vehicleId);
-            const tire = vehicle?.tires.find(t => t.id === m.tirePositionId);
+            const tire = vehicle?.tires?.find(t => t.id === m.tirePositionId);
             return (
               <div key={m.id} className="card-white p-4 space-y-2">
                 <div className="flex items-center justify-between">

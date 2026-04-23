@@ -47,7 +47,7 @@ export function WearDashboard() {
       </div>
 
       {vehicles.map(v => {
-        const tires = v.tires.map(t => ({ tire: t, measure: latestByTire.get(`${v.id}-${t.id}`) }));
+        const tires = (v.tires || []).map(t => ({ tire: t, measure: latestByTire.get(`${v.id}-${t.id}`) }));
         return (
           <div key={v.id} className="card-white mx-4 space-y-3">
             <div className="flex items-center justify-between">
